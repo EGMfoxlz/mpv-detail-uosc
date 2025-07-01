@@ -25,12 +25,9 @@ jobs:
     - name: Add required files
       working-directory: mpv-dist
       run: |
-        # 从仓库获取必要文件
         copy ..\mpv-icon.ico .
         copy ..\mpv-install.bat .
         copy ..\mpv-uninstall.bat .
-        
-        # 创建配置目录
         mkdir portable_config
         
     - name: Install uosc plugin
@@ -42,13 +39,11 @@ jobs:
         
         # 下载并解压uosc
         curl -L -o uosc.zip $release.assets[0].browser_download_url
-        7z x uosc.zip -o"portable_config" -y
+        7z x uosc.zip -oportable_config -y
         del uosc.zip
         
-        # 创建脚本配置目录
+        # 创建脚本配置目录并下载配置文件
         mkdir portable_config\script-opts
-        
-        # 下载uosc配置文件
         $confUrl = "https://github.com/tomasklaen/uosc/releases/download/$version/uosc.conf"
         curl -L -o portable_config\script-opts\uosc.conf $confUrl
         
@@ -62,14 +57,15 @@ jobs:
         7z a -r -mx9 mpv.7z *
         
         # 创建SFX配置文件
-        @"
-;!@Install@!UTF-8!
-Title="MPV Player Portable"
-BeginPrompt="This will install MPV Player to C:\mpv. Continue?"
-ExtractPath="C:\"
-ExecuteFile="C:\mpv\mpv-install.bat"
-;!@InstallEnd@!
-"@ | Out-File -Encoding ASCII config.txt
+        $configContent = @"
+        ;!@Install@!UTF-8!
+        Title="MPV Player Portable"
+        BeginPrompt="This will install MPV Player to C:\mpv. Continue?"
+        ExtractPath="C:\"
+        ="C:\mpv\mpv-install.bat"
+        ;!@InstallEnd@!
+        "@
+        Set-Content -Path config.txt -Value $configContent
         
         # 合并SFX模块+配置+压缩包
         copy "C:\Program Files\7-Zip\7z.sfx" .
