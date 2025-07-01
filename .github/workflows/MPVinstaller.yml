@@ -50,7 +50,7 @@ jobs:
         $configContent = ';!@Install@!UTF-8!Title="MPV Player Portable"BeginPrompt="This will install MPV Player to C:\mpv. Continue?"ExtractPath="C:\"ExecuteFile="C:\mpv\mpv-install.bat";!@InstallEnd@!'
         Set-Content -Path config.txt -Value $configContent
         copy "C:\Program Files\7-Zip\7z.sfx" .
-        copy /b 7z.sfx + config.txt + mpv.7z mpv-portable.exe
+        cmd /c "copy /b 7z.sfx + config.txt + mpv.7z mpv-portable.exe"
         
     - name: Upload to Release
       uses: softprops/action-gh-release@v1
