@@ -17,7 +17,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: 安装依赖工具
-        run: choco install -y 7zip unzip  # 仅安装7z（生成SFX）和unzip（下载资源）
+        run: choco install -y 7zip unzip  # 安装7z（生成SFX）和unzip（下载资源）
 
       - name: 下载MPV预编译包
         run: |
@@ -67,18 +67,18 @@ jobs:
         run: |
           # 创建SFX配置文件（修正7z SFX标准头）
           $sfxConfig = @"
-          ;;!@Install@!
+          ;!@Install@!
           Title=MPV Portable
-          ExtractPath=C:\  # 解压目标目录为C盘根目录
-          SetupIcon=mpv\mpv-icon.ico  # 自解压包图标路径（相对于SFX包）
-          BeginPrompt=即将解压MPV到C盘根目录，是否继续？  # 提示信息
-          Progress=Yes  # 显示进度条
-          Overwrite=1  # 强制覆盖已存在文件
-          "@
+          ExtractPath=C:\
+          SetupIcon=mpv\mpv-icon.ico
+          BeginPrompt=即将解压MPV到C盘根目录，是否继续？
+          Progress=Yes
+          Overwrite=1
+"@
           # 写入SFX配置到临时文件（确保无多余缩进）
           $sfxConfig | Out-File -Path "sfx_config.txt" -Encoding ASCII
 
-          # 生成自解压包（关键：7z会自动识别sfx_config.txt为SFX头）
+          # 生成自解压包（7z会自动识别sfx_config.txt为SFX头）
           7z a -t7z -mx9 -r "mpv-portable.exe" "sfx_config.txt" "mpv\*" -x!"sfx_config.txt"
 
       - name: 推送至GitHub Release
