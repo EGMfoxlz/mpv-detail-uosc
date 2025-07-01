@@ -7,7 +7,7 @@ on:
     - cron: '0 0 1 * *'
 
 jobs:
-  Build MPV Portable:
+  BuildMPVPortable:
     runs-on: windows-latest
     steps:
     - name: Checkout repository
