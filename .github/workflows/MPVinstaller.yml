@@ -7,7 +7,7 @@ on:
     - cron: '0 0 1 * *'
 
 jobs:
-  build:
+  Build MPV Portable:
     runs-on: windows-latest
     steps:
     - name: Checkout repository
@@ -55,7 +55,7 @@ jobs:
       working-directory: mpv-dist
       run: |
         7z a -r -mx9 mpv.7z *
-        $configContent = ';!@Install@!UTF-8!Title="MPV Player Portable"BeginPrompt="This will install MPV Player to C:\mpv. Continue?"ExtractPath="C:\mpv"ExecuteFile="C:\mpv\mpv-install.bat";!@InstallEnd@!'
+        $configContent = ';!@Install@!UTF-8!Title="MPV Player Portable";!@InstallEnd@!'
         Set-Content -Path config.txt -Value $configContent
         copy "C:\Program Files\7-Zip\7z.sfx" .
         cmd /c "copy /b 7z.sfx + config.txt + mpv.7z mpv-portable.exe"
