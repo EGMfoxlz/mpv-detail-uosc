@@ -33,41 +33,22 @@ jobs:
     - name: Install uosc plugin
       working-directory: mpv-dist
       run: |
-        # 获取最新uosc版本
         $release = (Invoke-RestMethod "https://api.github.com/repos/tomasklaen/uosc/releases/latest")
         $version = $release.tag_name
-        
-        # 下载并解压uosc
         curl -L -o uosc.zip $release.assets[0].browser_download_url
         7z x uosc.zip -oportable_config -y
         del uosc.zip
-        
-        # 创建脚本配置目录并下载配置文件
         mkdir portable_config\script-opts
         $confUrl = "https://github.com/tomasklaen/uosc/releases/download/$version/uosc.conf"
         curl -L -o portable_config\script-opts\uosc.conf $confUrl
-        
-        # 修改语言设置
         (Get-Content portable_config\script-opts\uosc.conf) -replace 'languages=slang,en', 'languages=zh-hans,slang,en' | Set-Content portable_config\script-opts\uosc.conf
         
     - name: Create self-extracting archive
       working-directory: mpv-dist
       run: |
-        # 创建7z压缩包
         7z a -r -mx9 mpv.7z *
-        
-        # 创建SFX配置文件
-        $configContent = @"
-        ;!@Install@!UTF-8!
-        Title="MPV Player Portable"
-        BeginPrompt="This will install MPV Player to C:\mpv. Continue?"
-        ExtractPath="C:\"
-        ="C:\mpv\mpv-install.bat"
-        ;!@InstallEnd@!
-        "@
+        $configContent = ';!@Install@!UTF-8!Title="MPV Player Portable"BeginPrompt="This will install MPV Player to C:\mpv. Continue?"ExtractPath="C:\"ExecuteFile="C:\mpv\mpv-install.bat";!@InstallEnd@!'
         Set-Content -Path config.txt -Value $configContent
-        
-        # 合并SFX模块+配置+压缩包
         copy "C:\Program Files\7-Zip\7z.sfx" .
         copy /b 7z.sfx + config.txt + mpv.7z mpv-portable.exe
         
