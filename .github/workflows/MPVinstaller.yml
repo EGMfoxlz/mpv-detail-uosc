@@ -65,27 +65,28 @@ jobs:
 
       - name: 生成7z自解压包（解压到C盘根目录）
         run: |
-          # 创建SFX配置文件（注意：修正SFX头为正确格式）
+          # 创建SFX配置文件（修正7z SFX标准头）
           $sfxConfig = @"
           ;;!@Install@!
           Title=MPV Portable
           ExtractPath=C:\  # 解压目标目录为C盘根目录
-          SetupIcon=mpv\mpv-icon.ico  # 自解压包图标
+          SetupIcon=mpv\mpv-icon.ico  # 自解压包图标路径（相对于SFX包）
           BeginPrompt=即将解压MPV到C盘根目录，是否继续？  # 提示信息
           Progress=Yes  # 显示进度条
-          Overwrite=1  # 覆盖已存在文件
+          Overwrite=1  # 强制覆盖已存在文件
 "@
+          # 写入SFX配置到临时文件（确保无多余缩进）
           $sfxConfig | Out-File -Path "sfx_config.txt" -Encoding ASCII
 
-          # 使用7z生成自解压包（合并SFX配置和文件）
+          # 生成自解压包（关键：7z会自动识别sfx_config.txt为SFX头）
           7z a -t7z -mx9 -r "mpv-portable.exe" "sfx_config.txt" "mpv\*" -x!"sfx_config.txt"
 
       - name: 推送至GitHub Release
-        uses: softprops/action-gh-release@v2  # 使用v2版本
+        uses: softprops/action-gh-release@v2
         with:
-          files: mpv-portable.exe  # 仅上传自解压包
-          tag_name: "mpv-portable-$(date +%Y%m%d)"  # 自动生成日期标签
+          files: mpv-portable.exe
+          tag_name: "mpv-portable-$(date +%Y%m%d)"
           release_name: "MPV Portable $(date +%Y-%m-%d)"
-          body: "自动构建的MPV便携版，解压到C盘根目录，包含uosc便携配置（中文语言支持）。"  # 发布说明
+          body: "自动构建的MPV便携版，解压到C盘根目录，包含uosc便携配置（中文语言支持）。"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
