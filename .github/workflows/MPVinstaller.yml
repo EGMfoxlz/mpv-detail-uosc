@@ -32,9 +32,14 @@ jobs:
         
     - name: Install uosc plugin
       working-directory: mpv-dist
+      id: uosc-version
       run: |
         $release = (Invoke-RestMethod "https://api.github.com/repos/tomasklaen/uosc/releases/latest")
         $version = $release.tag_name
+        
+        # 保存版本号到输出变量
+        echo "uosc_version=$version" >> $env:GITHUB_OUTPUT
+        
         curl -L -o uosc.zip $release.assets[0].browser_download_url
         7z x uosc.zip -oportable_config -y
         del uosc.zip
@@ -52,9 +57,21 @@ jobs:
         copy "C:\Program Files\7-Zip\7z.sfx" .
         cmd /c "copy /b 7z.sfx + config.txt + mpv.7z mpv-portable.exe"
         
+    - name: Create Git tag for uosc version
+      run: |
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+        git tag -a "${{ steps.uosc-version.outputs.uosc_version }}" -m "MPV build with uosc ${{ steps.uosc-version.outputs.uosc_version }}"
+        git push origin "${{ steps.uosc-version.outputs.uosc_version }}"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
     - name: Upload to Release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         files: mpv-dist/mpv-portable.exe
+        tag_name: "${{ steps.uosc-version.outputs.uosc_version }}"
+        name: "MPV Portable with uosc ${{ steps.uosc-version.outputs.uosc_version }}"
+        body: "Portable MPV player with uosc plugin version ${{ steps.uosc-version.outputs.uosc_version }}"
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
