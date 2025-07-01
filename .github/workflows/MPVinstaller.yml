@@ -1,0 +1,92 @@
+name: Build MPV Portable (Simple SFX)
+
+on:
+  workflow_dispatch:  # 手动触发构建
+    inputs:
+      mpv_version:
+        description: 'MPV 构建版本（留空使用最新）'
+        required: false
+        default: ''
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: 检出仓库文件
+        uses: actions/checkout@v4
+
+      - name: 安装依赖工具
+        run: choco install -y 7zip unzip  # 仅安装7z（生成SFX）和unzip（下载资源）
+
+      - name: 下载MPV预编译包
+        run: |
+          $mpvAssetName = if ($env:MPV_VERSION) {
+            "mpv-x86_64-pc-windows-msvc-${env:MPV_VERSION}.zip"
+          } else {
+            "mpv-x86_64-pc-windows-msvc.zip"
+          }
+          $mpvUrl = "https://nightly.link/mpv-player/mpv/workflows/build/master/${mpvAssetName}"
+          Invoke-WebRequest -Uri $mpvUrl -OutFile "mpv.zip"
+        shell: pwsh
+
+      - name: 解压并整理MPV目录
+        run: |
+          Expand-Archive -Path "mpv.zip" -DestinationPath .
+          # 查找并重命名MPV解压目录（处理版本号后缀）
+          $mpvDir = Get-ChildItem -Directory | Where-Object { $_.Name -match '^mpv-x86_64-pc-windows-msvc-' } | Select-Object -First 1
+          if (-not $mpvDir) { throw "未找到MPV目录" }
+          Rename-Item -Path $mpvDir.FullName -NewName "mpv" -Force
+
+      - name: 复制自定义文件（图标/安装脚本）
+        run: |
+          # 确保必要文件存在（仓库需包含这三个文件）
+          $requiredFiles = @("mpv-icon.ico", "mpv-install.bat", "mpv-uninstall.bat")
+          foreach ($file in $requiredFiles) {
+            if (-not (Test-Path $file)) { throw "缺少必要文件：$file" }
+            Copy-Item -Path $file -Destination "mpv/" -Force
+          }
+
+      - name: 下载并配置uosc（便携配置）
+        run: |
+          # 获取uosc最新发布信息
+          $uoscRelease = Invoke-RestMethod -Uri "https://api.github.com/repos/tomasklaen/uosc/releases/latest"
+          
+          # 下载uosc核心文件（uosc.zip）
+          $uoscZipAsset = $uoscRelease.assets | Where-Object { $_.name -eq "uosc.zip" }
+          Invoke-WebRequest -Uri $uoscZipAsset.browser_download_url -OutFile "uosc.zip"
+          Expand-Archive -Path "uosc.zip" -DestinationPath "mpv/portable_config" -Force
+
+          # 下载并修改uosc.conf（语言设置）
+          $uoscConfAsset = $uoscRelease.assets | Where-Object { $_.name -eq "uosc.conf" }
+          New-Item -Path "mpv/portable_config/script-opts" -ItemType Directory -Force | Out-Null
+          Invoke-WebRequest -Uri $uoscConfAsset.browser_download_url -OutFile "mpv/portable_config/script-opts/uosc.conf"
+          (Get-Content "mpv/portable_config/script-opts/uosc.conf" -Raw) -replace 'languages=slang,en', 'languages=zh-hans,slang,en' | Set-Content "mpv/portable_config/script-opts/uosc.conf"
+
+      - name: 生成7z自解压包（解压到C盘根目录）
+        run: |
+          # 创建SFX配置文件（设置解压路径和图标）
+          $sfxConfig = @"
+          ;!
+stall@!
+Title=MPV Portable
+ExtractPath=C:\  # 解压目标目录为C盘根目录
+SetupIcon=mpv\mpv-icon.ico  # 自解压包图标
+BeginPrompt=即将解压MPV到C盘根目录，是否继续？  # 提示信息
+Progress=Yes  # 显示进度条
+Overwrite=1  # 覆盖已存在文件
+"@
+          $sfxConfig | Out-File -Path "sfx_config.txt" -Encoding ASCII
+
+          # 使用7z生成自解压包（合并SFX配置和文件）
+          7z a -t7z -mx9 -r "mpv-portable.exe" "sfx_config.txt" "mpv\*" -x!"sfx_config.txt"
+
+      - name: 推送至GitHub Release
+        uses: softprops/action-gh-release@v2  # 使用v2版本
+        with:
+          files: mpv-portable.exe  # 仅上传自解压包
+          tag_name: "mpv-portable-$(date +%Y%m%d)"  # 自动生成日期标签
+          release_name: "MPV Portable $(date +%Y-%m-%d)"
+          body: "自动构建的MPV便携版，解压到C盘根目录，包含uosc便携配置（中文语言支持）。"  # 发布说明
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
