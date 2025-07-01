@@ -1,1 +1,1 @@
-# mpv-detail-uosc-
+个人MPV添加UOSC
