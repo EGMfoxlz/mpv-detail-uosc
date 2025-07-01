@@ -2,6 +2,9 @@ name: Build MPV Portable
 
 on:
   workflow_dispatch:  # 手动触发
+  schedule:
+    # 每月运行一次（每月1号00:00 UTC）
+    - cron: '0 0 1 * *'
 
 jobs:
   build:
@@ -18,75 +21,49 @@ jobs:
     - name: Download MPV build
       working-directory: mpv-dist
       run: |
-        # 下载MPV官方构建
         curl -L -o mpv.zip "https://nightly.link/mpv-player/mpv/workflows/build/master/mpv-x86_64-pc-windows-msvc.zip"
-        # 解压MPV构建
         7z x mpv.zip -y
         del mpv.zip
         
     - name: Add required files
       working-directory: mpv-dist
       run: |
-        # 添加必要的支持文件
         copy ..\mpv-icon.ico .
         copy ..\mpv-install.bat .
         copy ..\mpv-uninstall.bat .
-        # 创建便携配置目录
         mkdir portable_config
         
     - name: Install uosc plugin
       working-directory: mpv-dist
       id: uosc-version
       run: |
-        # 获取uosc最新版本信息
         $release = (Invoke-RestMethod "https://api.github.com/repos/tomasklaen/uosc/releases/latest")
         $version = $release.tag_name
-        
-        # 保存版本号到输出变量
         echo "uosc_version=$version" >> $env:GITHUB_OUTPUT
         
-        # 下载uosc.zip
         $uoscZipUrl = $release.assets | Where-Object { $_.name -eq "uosc.zip" } | Select-Object -ExpandProperty browser_download_url
         curl -L -o uosc.zip $uoscZipUrl
-        
-        # 确保目标目录存在
         mkdir -Force portable_config | Out-Null
-        
-        # 解压uosc.zip到portable_config文件夹
-        7z x uosc.zip -o"portable_config" -y
+        7z x uosc.zip -oportable_config -y
         del uosc.zip
-        
-        # 创建脚本选项目录
         mkdir -Force portable_config\script-opts | Out-Null
-        
-        # 下载uosc配置文件
         $confUrl = "https://github.com/tomasklaen/uosc/releases/download/$version/uosc.conf"
         curl -L -o portable_config\script-opts\uosc.conf $confUrl
-        
-        # 修改语言设置：添加中文支持
         (Get-Content portable_config\script-opts\uosc.conf) -replace 'languages=slang,en', 'languages=zh-hans,slang,en' | Set-Content portable_config\script-opts\uosc.conf
         
     - name: Create self-extracting archive
       working-directory: mpv-dist
       run: |
-        # 创建7z压缩包
         7z a -r -mx9 mpv.7z *
-        
-        # 创建SFX配置文件
-        $configContent = ';!@Install@!UTF-8!Title="MPV Player Portable"BeginPrompt="This will install MPV Player to C:\mpv. Continue?"ExtractPath="C:\"ExecuteFile="C:\mpv\mpv-install.bat";!@InstallEnd@!'
+        $configContent = ';!@Install@!UTF-8!Title="MPV Player Portable"BeginPrompt="This will install MPV Player to C:\mpv. Continue?"ExtractPath="C:\mpv"ExecuteFile="C:\mpv\mpv-install.bat";!@InstallEnd@!'
         Set-Content -Path config.txt -Value $configContent
-        
-        # 合并SFX模块+配置+压缩包
         copy "C:\Program Files\7-Zip\7z.sfx" .
         cmd /c "copy /b 7z.sfx + config.txt + mpv.7z mpv-portable.exe"
         
     - name: Create Git tag for uosc version
       run: |
-        # 设置Git用户信息
         git config user.name "GitHub Actions"
         git config user.email "actions@github.com"
-        
-        # 创建并推送标签
         git tag -a "${{ steps.uosc-version.outputs.uosc_version }}" -m "MPV build with uosc ${{ steps.uosc-version.outputs.uosc_version }}"
         git push origin "${{ steps.uosc-version.outputs.uosc_version }}"
       env:
@@ -101,3 +78,12 @@ jobs:
         body: "Portable MPV player with uosc plugin version ${{ steps.uosc-version.outputs.uosc_version }}"
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    
+    # 添加工作流运行清理步骤
+    - name: Clean up old workflow runs
+      uses: Mattraks/delete-workflow-runs@v2
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        repository: ${{ github.repository }}
+        retain_days: 0
+        keep_minimum_runs: 0
